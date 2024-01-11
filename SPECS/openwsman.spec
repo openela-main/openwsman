@@ -3,7 +3,7 @@
 
 Name:		openwsman
 Version:	2.6.5
-Release:	9%{?dist}
+Release:	10%{?dist}
 Summary:	Open source Implementation of WS-Management
 
 License:	BSD
@@ -24,6 +24,8 @@ Patch6:		openwsman-2.6.5-CVE-2019-3816.patch
 # Patch7: fixes CVE-2019-3833, rhbz#1687865
 Patch7:		openwsman-2.6.5-CVE-2019-3833.patch
 Patch8:		openwsman-2.6.5-http-unauthorized-improve.patch
+# Patch9: fixes cert issue, rhbz#2220821
+Patch9:         openwsman-2.6.5-update-ssleay-conf.patch
 BuildRequires:	swig
 BuildRequires:	libcurl-devel libxml2-devel pam-devel sblim-sfcc-devel
 BuildRequires:	python3 python3-devel ruby ruby-devel rubygems-devel perl-interpreter
@@ -133,6 +135,7 @@ You can use it to send shell commands to a remote Windows hosts.
 %patch6 -p1 -b .CVE-2019-3816
 %patch7 -p1 -b .CVE-2019-3833
 %patch8 -p1 -b .http-unauthorized-improve
+%patch9 -p1 -b .update-ssleay-conf
 
 %build
 # Removing executable permissions on .c and .h files to fix rpmlint warnings. 
@@ -289,13 +292,17 @@ rm -f /var/log/wsmand.log
 %{_bindir}/winrs
 
 %changelog
-* Tue Sep 20 2022 Vitezslav Crhonek <vcrhonek@redhat.com> - 2.6.5-9
-- Rebuild
-  Related: #2124894
+* Thu Jul 27 2023 Vitezslav Crhonek <vcrhonek@redhat.com> - 2.6.5-10
+- Remove RANDFILE and increase default bits in ssleay.conf
+  Resolves: #2220821
+
+* Tue Feb 14 2023 Vitezslav Crhonek <vcrhonek@redhat.com> - 2.6.5-9
+- Add rpminspect.yaml
+  Related: #2105315
 
 * Thu Sep 08 2022 Vitezslav Crhonek <vcrhonek@redhat.com> - 2.6.5-8
 - Improve handling of HTTP 401 Unauthorized
-  Resolves: #2124894
+  Resolves: #2105315
 
 * Mon May 11 2020 Vitezslav Crhonek <vcrhonek@redhat.com> - 2.6.5-7
 - Fix CVE-2019-3833
