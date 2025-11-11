@@ -6,7 +6,7 @@ After=syslog.target
 Type=forking
 ExecStart=/usr/sbin/openwsmand -S
 ExecStartPre=/etc/openwsman/owsmantestcert.sh
-PIDFile=/var/run/wsmand.pid
+PIDFile=/run/wsmand.pid
 
 [Install]
 WantedBy=multi-user.target

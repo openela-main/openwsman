@@ -25,7 +25,7 @@
 
 Name:		openwsman
 Version:	2.7.2
-Release:	9%{?dist}
+Release:	10%{?dist}
 Summary:	Open source Implementation of WS-Management
 
 License:	BSD-3-Clause AND MIT
@@ -50,6 +50,7 @@ Patch3:		openwsman-2.6.2-openssl-1.1-fix.patch
 Patch4:		openwsman-2.6.5-http-status-line.patch
 Patch5:		openwsman-2.6.8-update-ssleay-conf.patch
 Patch6:		openwsman-2.7.2-fix-ftbfs.patch
+Patch7:		openwsman-2.7.2-post-quantum.patch
 BuildRequires:	make
 BuildRequires:	swig
 BuildRequires:	libcurl-devel libxml2-devel pam-devel sblim-sfcc-devel
@@ -408,6 +409,12 @@ fi
 %endif
 
 %changelog
+* Mon Jul 14 2025 Vitezslav Crhonek <vcrhonek@redhat.com> - 2.7.2-10
+- Support added for post-quantum cryptography
+  Resolves: RHEL-93091
+- Remove deprecated path from systemd service file
+  Resolves: RHEL-101169
+
 * Tue Oct 29 2024 Troy Dawson <tdawson@redhat.com> - 2.7.2-9
 - Bump release for October 2024 mass rebuild:
   Resolves: RHEL-64018
