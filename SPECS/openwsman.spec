@@ -24,8 +24,8 @@
 %endif
 
 Name:		openwsman
-Version:	2.7.2
-Release:	10%{?dist}
+Version:	2.8.1
+Release:	3%{?dist}
 Summary:	Open source Implementation of WS-Management
 
 License:	BSD-3-Clause AND MIT
@@ -49,8 +49,11 @@ Patch2:		openwsman-2.4.12-ruby-binding-build.patch
 Patch3:		openwsman-2.6.2-openssl-1.1-fix.patch
 Patch4:		openwsman-2.6.5-http-status-line.patch
 Patch5:		openwsman-2.6.8-update-ssleay-conf.patch
-Patch6:		openwsman-2.7.2-fix-ftbfs.patch
 Patch7:		openwsman-2.7.2-post-quantum.patch
+Patch8:		openwsman-2.7.2-ssl-certs-gen-changes.patch
+Patch9:		openwsman-2.8.1-fix-ruby-io.patch
+# Patch10 needed just for compat
+Patch10:	openwsman-2.8.1-facility-definition.patch
 BuildRequires:	make
 BuildRequires:	swig
 BuildRequires:	libcurl-devel libxml2-devel pam-devel sblim-sfcc-devel
@@ -258,6 +261,7 @@ rm -f %{buildroot}/%{_libdir}/openwsman/plugins/*.la
 rm -f %{buildroot}/%{_libdir}/openwsman/authenticators/*.la
 %if %{with_ruby}
 [ -d %{buildroot}/%{ruby_vendorlibdir} ] && rm -f %{buildroot}/%{ruby_vendorlibdir}/openwsmanplugin.rb
+[ -d %{buildroot}/%{ruby_sitelibdir} ] && rm -f %{buildroot}%{ruby_sitelibdir}/openwsmanplugin.rb
 [ -d %{buildroot}/%{ruby_vendorlibdir} ] && rm -f %{buildroot}/%{ruby_vendorlibdir}/openwsman.rb
 %endif
 mkdir -p %{buildroot}%{_sysconfdir}/init.d
@@ -377,7 +381,7 @@ fi
 # the server fails to start without these files.
 %dir %{_sysconfdir}/openwsman
 %config(noreplace) %{_sysconfdir}/openwsman/openwsman.conf
-%config(noreplace) %{_sysconfdir}/openwsman/ssleay.cnf
+%config(noreplace) %verify(not size md5 mtime) %{_sysconfdir}/openwsman/ssleay.cnf
 %attr(0755,root,root) %{_sysconfdir}/openwsman/owsmangencert.sh
 %attr(0755,root,root) %{_sysconfdir}/openwsman/owsmantestcert.sh
 %config(noreplace) %{_sysconfdir}/pam.d/openwsman
@@ -409,6 +413,22 @@ fi
 %endif
 
 %changelog
+* Mon Feb 09 2026 Vitezslav Crhonek <vcrhonek@redhat.com> - 2.8.1-3
+- Modify RPM verification of ssleay.cnf
+  Related: RHEL-113443
+
+* Wed Jan 28 2026 Vitezslav Crhonek <vcrhonek@redhat.com> - 2.8.1-2
+- Fix bogus 'sscg' arguments
+  Related: RHEL-113443
+
+* Thu Oct 23 2025 Vitezslav Crhonek <vcrhonek@redhat.com> - 2.8.1-1
+- Update to openwsman-2.8.1
+  Resolves: RHEL-99191
+
+* Tue Oct 14 2025 Vitezslav Crhonek <vcrhonek@redhat.com> - 2.7.2-11
+- Update OpenSSL certificates set up
+  Resolves: RHEL-113443
+
 * Mon Jul 14 2025 Vitezslav Crhonek <vcrhonek@redhat.com> - 2.7.2-10
 - Support added for post-quantum cryptography
   Resolves: RHEL-93091
