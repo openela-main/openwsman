@@ -1,9 +1,10 @@
 # RubyGems's macros expect gem_name to exist.
 %global		gem_name %{name}
+%global		compatver	2.6.8
 
 Name:		openwsman
-Version:	2.6.8
-Release:	23%{?dist}
+Version:	2.8.1
+Release:	2%{?dist}
 Summary:	Open source Implementation of WS-Management
 
 License:	BSD
@@ -15,15 +16,19 @@ Source1:	openwsmand.8.gz
 Source2:	openwsmand.service
 # script for testing presence of the certificates in ExecStartPre
 Source3:	owsmantestcert.sh
+# source for libwsman_client lib compatibility
+Source4:	https://github.com/Openwsman/openwsman/archive/v%{compatver}.tar.gz
 Patch1:		openwsman-2.4.0-pamsetup.patch
 Patch2:		openwsman-2.4.12-ruby-binding-build.patch
 Patch3:		openwsman-2.6.2-openssl-1.1-fix.patch
 Patch4:		openwsman-2.6.5-http-status-line.patch
+# Patch5 is just for compat package, not needed in 2.8.1
 Patch5:		openwsman-2.6.5-libcurl-error-codes-update.patch
-Patch6:		openwsman-2.6.8-CVE-2019-3816.patch
-Patch7:		openwsman-2.6.8-CVE-2019-3833.patch
 Patch8:		openwsman-2.6.8-update-ssleay-conf.patch
-Patch9:		openwsman-2.6.8-http-unauthorized-improve.patch
+Patch10:	openwsman-2.6.8-ssl-certs-gen-changes.patch
+# Patch11 is just for compat
+Patch11:	openwsman-2.8.1-facility-definition.patch
+Patch12:	openwsman-2.8.1-post-quantum.patch
 BuildRequires: make
 BuildRequires:	swig
 BuildRequires:	libcurl-devel libxml2-devel pam-devel sblim-sfcc-devel
@@ -126,20 +131,27 @@ This is a command line tool for the Windows Remote Shell protocol.
 You can use it to send shell commands to a remote Windows hosts.
 
 %prep
-%setup -q
+%setup -q -c -n %{name} -a 4
+# apply patches for regular source
+cd %{name}-%{version}
 
-%patch1 -p1 -b .pamsetup
-%patch2 -p1 -b .ruby-binding-build
-%patch3 -p1 -b .openssl-1.1-fix
-%patch4 -p1 -b .http-status-line
-%patch5 -p1 -b .libcurl-error-codes-update
-%patch6 -p1 -b .CVE-2019-3816
-%patch7 -p1 -b .CVE-2019-3833
-%patch8 -p1 -b .update-ssleay-conf
-%patch9 -p1 -b .http-unauthorized-improve
+%patch -P1 -p1 -b .pamsetup
+%patch -P2 -p1 -b .ruby-binding-build
+%patch -P3 -p1 -b .openssl-1.1-fix
+%patch -P4 -p1 -b .http-status-line
+%patch -P8 -p1 -b .update-ssleay-conf
+%patch -P10 -p1 -b .ssl-certs-gen-changes
+%patch -P11 -p1 -b .facility-definition
+%patch -P12 -p1 -b .post-quantum
+
+# apply patches for compatibility source
+cd ../%{name}-%{compatver}
+%patch -P5 -p1 -b .libcurl-error-codes-update
 
 %build
-# Removing executable permissions on .c and .h files to fix rpmlint warnings. 
+# build regular source
+cd %{name}-%{version}
+# Removing executable permissions on .c and .h files to fix rpmlint warnings.
 chmod -x src/cpp/WsmanClient.h
 
 rm -rf build
@@ -166,13 +178,45 @@ make
 
 # Make the freshly build openwsman libraries available to build the gem's
 # binary extension.
-export LIBRARY_PATH=%{_builddir}/%{name}-%{version}/build/src/lib
-export CPATH=%{_builddir}/%{name}-%{version}/include/
-export LD_LIBRARY_PATH=%{_builddir}/%{name}-%{version}/build/src/lib/
+export LIBRARY_PATH=%{_builddir}/%{name}/%{name}-%{version}/build/src/lib
+export CPATH=%{_builddir}/%{name/}%{name}-%{version}/include/
+export LD_LIBRARY_PATH=%{_builddir}/%{name}/%{name}-%{version}/build/src/lib/
 
 %gem_install -n ./bindings/ruby/%{name}-%{version}.gem
 
+# build compat source
+cd ../../%{name}-%{compatver}
+# Removing executable permissions on .c and .h files to fix rpmlint warnings.
+chmod -x src/cpp/WsmanClient.h
+
+rm -rf build
+mkdir build
+
+export RPM_OPT_FLAGS="$RPM_OPT_FLAGS -DFEDORA -DNO_SSL_CALLBACK"
+export CFLAGS="$RPM_OPT_FLAGS -fPIC -pie -Wl,-z,relro -Wl,-z,now"
+export CXXFLAGS="$RPM_OPT_FLAGS -fPIC -pie -Wl,-z,relro -Wl,-z,now"
+cd build
+cmake \
+	-DCMAKE_INSTALL_PREFIX=/usr \
+	-DCMAKE_VERBOSE_MAKEFILE=TRUE \
+	-DCMAKE_BUILD_TYPE=Release \
+	-DCMAKE_C_FLAGS_RELEASE:STRING="$RPM_OPT_FLAGS -fno-strict-aliasing" \
+	-DCMAKE_CXX_FLAGS_RELEASE:STRING="$RPM_OPT_FLAGS" \
+	-DCMAKE_SKIP_RPATH=1 \
+	-DPACKAGE_ARCHITECTURE=`uname -m` \
+	-DLIB=%{_lib} \
+	-DBUILD_JAVA=no \
+	-DBUILD_PYTHON=no \
+	-DBUILD_PYTHON3=no \
+	-DBUILD_PERL=no \
+	-DBUILD_RUBY=no \
+	..
+
+make
+
 %install
+# install regular source
+cd %{name}-%{version}
 cd build
 
 # Do not install the ruby extension, we are proviging the rubygem- instead.
@@ -184,6 +228,7 @@ rm -f %{buildroot}/%{_libdir}/*.la
 rm -f %{buildroot}/%{_libdir}/openwsman/plugins/*.la
 rm -f %{buildroot}/%{_libdir}/openwsman/authenticators/*.la
 [ -d %{buildroot}/%{ruby_vendorlibdir} ] && rm -f %{buildroot}/%{ruby_vendorlibdir}/openwsmanplugin.rb
+[ -d %{buildroot}/%{ruby_sitelibdir} ] && rm -f %{buildroot}%{ruby_sitelibdir}/openwsmanplugin.rb
 [ -d %{buildroot}/%{ruby_vendorlibdir} ] && rm -f %{buildroot}/%{ruby_vendorlibdir}/openwsman.rb
 mkdir -p %{buildroot}%{_sysconfdir}/init.d
 install -m 644 etc/openwsman.conf %{buildroot}/%{_sysconfdir}/openwsman
@@ -209,6 +254,14 @@ rm -rf %{buildroot}%{gem_instdir}/ext
 mkdir -p %{buildroot}%{gem_extdir_mri}
 cp -a ./build%{gem_extdir_mri}/{gem.build_complete,*.so} %{buildroot}%{gem_extdir_mri}/
 
+# install compat library
+cd ../%{name}-%{compatver}
+install build/src/lib/libwsman_client.so.4.0.0 %{buildroot}/%{_libdir}
+# create symlink
+pushd %{buildroot}/%{_libdir}
+ln -s libwsman_client.so.4.0.0 libwsman_client.so.4
+popd
+
 %ldconfig_scriptlets -n libwsman1
 
 %post server
@@ -226,25 +279,25 @@ rm -f /var/log/wsmand.log
 %ldconfig_scriptlets client
 
 %files -n libwsman1
-%doc AUTHORS COPYING ChangeLog README.md TODO
+%doc %{name}-%{version}/AUTHORS %{name}-%{version}/COPYING %{name}-%{version}/ChangeLog %{name}-%{version}/README.md %{name}-%{version}/TODO
 %{_libdir}/libwsman.so.*
 %{_libdir}/libwsman_client.so.*
 %{_libdir}/libwsman_curl_client_transport.so.*
 
 %files -n libwsman-devel
-%doc AUTHORS COPYING ChangeLog README.md
+%doc %{name}-%{version}/AUTHORS %{name}-%{version}/COPYING %{name}-%{version}/ChangeLog %{name}-%{version}/README.md
 %{_includedir}/*
 %{_libdir}/pkgconfig/*
 %{_libdir}/*.so
 
 %files python3
-%doc AUTHORS COPYING ChangeLog README.md
+%doc %{name}-%{version}/AUTHORS %{name}-%{version}/COPYING %{name}-%{version}/ChangeLog %{name}-%{version}/README.md
 %{python3_sitearch}/*.so
 %{python3_sitearch}/*.py
 %{python3_sitearch}/__pycache__/*
 
 %files -n rubygem-%{gem_name}
-%doc AUTHORS COPYING ChangeLog README.md
+%doc %{name}-%{version}/AUTHORS %{name}-%{version}/COPYING %{name}-%{version}/ChangeLog %{name}-%{version}/README.md
 %dir %{gem_instdir}
 %{gem_libdir}
 %{gem_extdir_mri}
@@ -255,17 +308,17 @@ rm -f /var/log/wsmand.log
 %doc %{gem_docdir}
 
 %files perl
-%doc AUTHORS COPYING ChangeLog README.md
+%doc %{name}-%{version}/AUTHORS %{name}-%{version}/COPYING %{name}-%{version}/ChangeLog %{name}-%{version}/README.md
 %{perl_vendorarch}/openwsman.so
 %{perl_vendorlib}/openwsman.pm
 
 %files server
-%doc AUTHORS COPYING ChangeLog README.md
+%doc %{name}-%{version}/AUTHORS %{name}-%{version}/COPYING %{name}-%{version}/ChangeLog %{name}-%{version}/README.md
 # Don't remove *.so files from the server package.
 # the server fails to start without these files.
 %dir %{_sysconfdir}/openwsman
 %config(noreplace) %{_sysconfdir}/openwsman/openwsman.conf
-%config(noreplace) %{_sysconfdir}/openwsman/ssleay.cnf
+%config(noreplace) %verify(not size md5 mtime) %{_sysconfdir}/openwsman/ssleay.cnf
 %attr(0755,root,root) %{_sysconfdir}/openwsman/owsmangencert.sh
 %attr(0755,root,root) %{_sysconfdir}/openwsman/owsmantestcert.sh
 %config(noreplace) %{_sysconfdir}/pam.d/openwsman
@@ -282,7 +335,7 @@ rm -f /var/log/wsmand.log
 %{_mandir}/man8/*
 
 %files client
-%doc AUTHORS COPYING ChangeLog README.md
+%doc %{name}-%{version}/AUTHORS %{name}-%{version}/COPYING %{name}-%{version}/ChangeLog %{name}-%{version}/README.md
 %{_libdir}/libwsman_clientpp.so.*
 %config(noreplace) %{_sysconfdir}/openwsman/openwsman_client.conf
 
@@ -290,6 +343,22 @@ rm -f /var/log/wsmand.log
 %{_bindir}/winrs
 
 %changelog
+* Wed Feb 04 2026 Vitezslav Crhonek <vcrhonek@redhat.com> - 2.8.1-2
+- Support added for post-quantum cryptography
+  Resolves: RHEL-127516
+- Fix bogus 'sscg' arguments
+  Related: RHEL-118292
+
+* Thu Oct 23 2025 Vitezslav Crhonek <vcrhonek@redhat.com> - 2.8.1-1
+- Update to openwsman-2.8.1
+  Resolves: RHEL-97643
+- Add libwsman-client.so.4 for backward compatibility
+  Related: RHEL-97643
+
+* Tue Oct 14 2025 Vitezslav Crhonek <vcrhonek@redhat.com> - 2.6.8-24
+- Update OpenSSL certificates set up
+  Resolves: RHEL-118292
+
 * Thu Nov 24 2022 Vitezslav Crhonek <vcrhonek@redhat.com> - 2.6.8-23
 - Improve handling of HTTP 401 Unauthorized
   Resolves: #2127415

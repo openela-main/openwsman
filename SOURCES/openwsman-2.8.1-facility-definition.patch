@@ -1,0 +1,16 @@
+diff -up openwsman-2.8.1/src/lib/u/log.c.orig openwsman-2.8.1/src/lib/u/log.c
+--- openwsman-2.8.1/src/lib/u/log.c.orig	2025-01-23 10:23:52.000000000 +0100
++++ openwsman-2.8.1/src/lib/u/log.c	2025-10-22 09:22:30.104144805 +0200
+@@ -25,8 +25,10 @@
+ 
+ #include <u/syslog.h>
+ 
+-/* applications that use libu will define their own "int facility" variable */
+-extern int facility;
++/* Define facility in the library for backward compatibility with openwsman 2.6.8
++ * Applications can still override this if needed */
++int facility = LOG_DAEMON;
++ 
+ 
+ /* log hook. if not-zero use this function to write log messages */
+ static u_log_hook_t hook = NULL;

@@ -1,12 +1,54 @@
-diff -up openwsman-2.4.12/bindings/ruby/extconf.rb.orig openwsman-2.4.12/bindings/ruby/extconf.rb
---- openwsman-2.4.12/bindings/ruby/extconf.rb.orig	2015-02-09 09:28:58.232581263 +0100
-+++ openwsman-2.4.12/bindings/ruby/extconf.rb	2015-02-09 09:38:22.836772879 +0100
-@@ -32,7 +32,7 @@ swig = find_executable("swig")
+diff -up openwsman-2.8.1/bindings/ruby/extconf.rb.orig openwsman-2.8.1/bindings/ruby/extconf.rb
+--- openwsman-2.8.1/bindings/ruby/extconf.rb.orig	2025-01-23 10:23:52.000000000 +0100
++++ openwsman-2.8.1/bindings/ruby/extconf.rb	2025-10-20 12:55:46.327604671 +0200
+@@ -5,16 +5,31 @@
+ require 'mkmf'
+ # $CFLAGS = "#{$CFLAGS} -Werror"
+ 
++# libwsman requires 'int facility' to be defined by the application
++# Add syslog.h for LOG_DAEMON constant
++$CFLAGS = "#{$CFLAGS} -include syslog.h"
++
+ # requires wsman, wsman_client, and libxml2
++# Add build directory to library search path
++$LDFLAGS = "#{$LDFLAGS} -L/builddir/build/BUILD/openwsman/openwsman-2.8.1/build/src/lib"
++
++# Add BOTH source include roots (and their /u) to compilation flags
++$CPPFLAGS = "#{$CPPFLAGS} " \
++"-I/builddir/build/BUILD/openwsman-2.8.1/include " \
++"-I/builddir/build/BUILD/openwsman-2.8.1/include/u " \
++"-I/builddir/build/BUILD/openwsman/openwsman-2.8.1/include " \
++"-I/builddir/build/BUILD/openwsman/openwsman-2.8.1/include/u"
+ 
+-unless have_library('wsman', 'wsman_create_doc')
++# Custom test for libwsman that includes facility definition
++unless try_link("#include <syslog.h>\n#include <wsman-xml-api.h>\nint facility = LOG_DAEMON;\nint main(void) { (void)wsman_create_doc(); return 0; }", '-lwsman -lxml2')
+   STDERR.puts "Cannot find wsman_create_doc() in libwsman"
+   STDERR.puts "Is openwsman-devel installed ?"
+   exit 1
+ end
+ find_header 'wsman-xml-api.h', '/usr/include/openwsman'
+ 
+-unless have_library('wsman_client', 'wsmc_create')
++# Custom test for libwsman_client that includes facility definition
++unless try_link("#include <syslog.h>\n#include <wsman-client-api.h>\nint facility = LOG_DAEMON;\nint main(void) { (void)wsmc_create(\"localhost\", 80, \"/wsman\", \"http\", \"u\", \"p\"); return 0; }", '-lwsman_client -lwsman -lxml2')
+   STDERR.puts "Cannot find wsmc_create() in libwsman_client"
+   STDERR.puts "Is openwsman-devel installed ?"
+   exit 1
+@@ -32,8 +47,14 @@ swig = find_executable("swig")
  raise "SWIG not found" unless swig
  
  major, minor, path = RUBY_VERSION.split(".")
 -raise "SWIG failed to run" unless system("#{swig} -ruby -autorename -DRUBY_VERSION=#{major}#{minor} -I. -I/usr/include/openwsman -o openwsman_wrap.c openwsman.i")
-+raise "SWIG failed to run" unless system("#{swig} -ruby -autorename -DRUBY_VERSION=#{major}#{minor} -I. -I/usr/include/openwsman -I/builddir/build/BUILD/openwsman-2.6.8/include/ -o openwsman_wrap.c openwsman.i")
++raise "SWIG failed to run" unless system("#{swig} -ruby -autorename -DRUBY_VERSION=#{major}#{minor} " \
++"-I. -I/usr/include/openwsman " \
++"-I/builddir/build/BUILD/openwsman-2.8.1/include " \
++"-I/builddir/build/BUILD/openwsman-2.8.1/include/u " \
++"-I/builddir/build/BUILD/openwsman/openwsman-2.8.1/include " \
++"-I/builddir/build/BUILD/openwsman/openwsman-2.8.1/include/u " \
++"-o openwsman_wrap.c openwsman.i")
  
- $CPPFLAGS = "-I/usr/include/openwsman -I.."
+-$CPPFLAGS = "-I/usr/include/openwsman -I.."
++$CPPFLAGS = "#{$CPPFLAGS} -I/usr/include/openwsman -I.."
  
+ create_makefile('_openwsman')
